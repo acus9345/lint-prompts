@@ -1,0 +1,35 @@
+name: lint-prompts
+description: Lint prompt template files for unfilled variables, duplicate instructions, token budgets, broken JSON and unclosed tags.
+author: acus9345
+branding:
+  icon: check-square
+  color: purple
+
+inputs:
+  paths:
+    description: Files or folders to lint, separated by spaces. Defaults to the config's "paths", or the repo root.
+    required: false
+    default: ''
+  config:
+    description: Path to a config file. Defaults to lint-prompts.config.json, searched upward.
+    required: false
+    default: ''
+  max-warnings:
+    description: Fail when there are more than this many warnings. Empty means warnings never fail the job.
+    required: false
+    default: ''
+
+runs:
+  using: composite
+  steps:
+    - shell: bash
+      env:
+        INPUT_PATHS: ${{ inputs.paths }}
+        INPUT_CONFIG: ${{ inputs.config }}
+        INPUT_MAX_WARNINGS: ${{ inputs.max-warnings }}
+      run: |
+        args=(--format github)
+        [ -n "$INPUT_CONFIG" ] && args+=(--config "$INPUT_CONFIG")
+        [ -n "$INPUT_MAX_WARNINGS" ] && args+=(--max-warnings "$INPUT_MAX_WARNINGS")
+        read -r -a paths <<< "$INPUT_PATHS"
+        node "$GITHUB_ACTION_PATH/bin/lint-prompts.js" "${args[@]}" "${paths[@]}"

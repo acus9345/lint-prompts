@@ -1,0 +1,52 @@
+{
+  "name": "lint-prompts",
+  "version": "0.1.0",
+  "description": "Lint prompt template files before they ship: unfilled {{variables}}, duplicate or contradicting instructions, token budgets, broken JSON examples and unclosed XML tags. Zero dependencies.",
+  "type": "module",
+  "main": "./src/index.js",
+  "types": "./index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./index.d.ts",
+      "default": "./src/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "bin": {
+    "lint-prompts": "bin/lint-prompts.js"
+  },
+  "files": [
+    "bin",
+    "src",
+    "index.d.ts"
+  ],
+  "scripts": {
+    "test": "node --test",
+    "lint:examples": "node bin/lint-prompts.js examples --config examples/lint-prompts.config.json"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "keywords": [
+    "prompt",
+    "prompts",
+    "lint",
+    "linter",
+    "llm",
+    "template",
+    "mustache",
+    "jinja",
+    "prompt-engineering",
+    "cli"
+  ],
+  "author": "acus9345",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/acus9345/lint-prompts.git"
+  },
+  "homepage": "https://github.com/acus9345/lint-prompts#readme",
+  "bugs": {
+    "url": "https://github.com/acus9345/lint-prompts/issues"
+  }
+}

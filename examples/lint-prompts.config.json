@@ -1,0 +1,7 @@
+{
+  "budget": 8000,
+  "files": {
+    "prompts/support.md": { "vars": ["customer", "question", "order_id"] },
+    "prompts/summarize.md": { "varsFrom": "types.ts#SummarizeVars", "budget": 40 }
+  }
+}
