@@ -96,8 +96,10 @@ function scanDouble(text) {
     const tag = body.split(/\s+/)[0];
     const rest = body.slice(tag.length).trim();
     if (tag === 'raw') {
-      const end = text.indexOf('endraw', re.lastIndex);
-      if (end !== -1) re.lastIndex = end;
+      const endRe = /\{%-?\s*endraw\s*-?%\}/g;
+      endRe.lastIndex = re.lastIndex;
+      const end = endRe.exec(text);
+      re.lastIndex = end ? endRe.lastIndex : text.length;
       continue;
     }
     if (tag === 'for') {
@@ -106,9 +108,6 @@ function scanDouble(text) {
         for (const t of f[1].split(',')) defined.add(t.trim());
         for (const name of identifiersIn(f[2] + ' ' + (f[3] ?? ''))) use(name, m.index, raw);
       }
-      depth++;
-    } else if (tag === 'endfor') {
-      depth = Math.max(0, depth - 1);
     } else if (tag === 'set' || tag === 'with') {
       const s = rest.match(/^([\w\s,]+?)\s*(?:=\s*([\s\S]+))?$/);
       if (s) {

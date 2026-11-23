@@ -13,13 +13,14 @@ const SKIP_DIRS = new Set(['node_modules', '.git', 'dist', 'build', 'coverage'])
 
 /** Expands folders into the prompt files inside them. Files named explicitly are always kept. */
 export function collectFiles(paths, extensions = EXTENSIONS) {
+  const normalizedExts = extensions.map((ext) => ext.toLowerCase());
   const out = [];
   const walk = (dir) => {
     for (const entry of readdirSync(dir, { withFileTypes: true }).sort((a, b) => a.name.localeCompare(b.name))) {
       const full = join(dir, entry.name);
       if (entry.isDirectory()) {
         if (!SKIP_DIRS.has(entry.name) && !entry.name.startsWith('.')) walk(full);
-      } else if (extensions.some((ext) => entry.name.toLowerCase().endsWith(ext))) {
+      } else if (normalizedExts.some((ext) => entry.name.toLowerCase().endsWith(ext))) {
         out.push(full);
       }
     }
@@ -37,8 +38,14 @@ export function collectFiles(paths, extensions = EXTENSIONS) {
  */
 export function lintFiles(paths, { config = {}, cwd = process.cwd(), overrides = {} } = {}) {
   const base = config.dir ?? cwd;
+  const definedOverrides = Object.fromEntries(Object.entries(overrides).filter(([, v]) => v !== undefined));
   return collectFiles(paths.map((p) => resolve(cwd, p)), config.extensions).map((file) => {
-    const options = { ...optionsFor(config, toPosix(relative(base, file))), ...overrides };
+    const baseOptions = optionsFor(config, toPosix(relative(base, file)));
+    const options = {
+      ...baseOptions,
+      ...definedOverrides,
+      ...(baseOptions.rules || overrides.rules ? { rules: { ...baseOptions.rules, ...overrides.rules } } : {}),
+    };
     return { file: toPosix(relative(cwd, file)), messages: lintText(readFileSync(file, 'utf8'), options) };
   });
 }

@@ -30,6 +30,11 @@ test('clean file exits 0', () => {
 test('usage errors exit 2', () => {
   assert.equal(run('--nope').status, 2);
   assert.equal(run('missing-folder').status, 2);
+  assert.equal(run('test/fixtures/clean.md', '--syntax', 'mustache').status, 2);
+  assert.equal(run('test/fixtures/clean.md', '--budget', '').status, 2);
+  assert.equal(run('test/fixtures/clean.md', '--budget', '0').status, 2);
+  assert.equal(run('test/fixtures/clean.md', '--max-warnings', '').status, 2);
+  assert.equal(run('--vars', 'topic', '-c', 'test/fixtures/empty.json', '--', 'test/fixtures/clean.md').status, 0);
   assert.match(run('--version').stdout, /^\d+\.\d+\.\d+/);
   assert.match(run('--help').stdout, /Usage: lint-prompts/);
 });

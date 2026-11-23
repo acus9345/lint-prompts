@@ -30,11 +30,12 @@ function pretty(results) {
 
 function github(results) {
   const escape = (s) => s.replace(/%/g, '%25').replace(/\r/g, '%0D').replace(/\n/g, '%0A');
+  const escapeProp = (s) => escape(s).replace(/:/g, '%3A').replace(/,/g, '%2C');
   const lines = [];
   for (const { file, messages } of results) {
     for (const m of messages) {
       const kind = m.severity === 'error' ? 'error' : 'warning';
-      const where = `file=${file}` + (m.line ? `,line=${m.line}` : '');
+      const where = `file=${escapeProp(file)}` + (m.line ? `,line=${m.line}` : '');
       lines.push(`::${kind} ${where},title=lint-prompts (${m.rule})::${escape(m.message)}`);
     }
   }

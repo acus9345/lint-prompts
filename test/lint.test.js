@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { lintText, scanVariables, typeKeys, optionsFor } from '../src/index.js';
+import { lintText, lintFiles, collectFiles, scanVariables, typeKeys, optionsFor, format } from '../src/index.js';
 
 const rules = (messages) => messages.map((m) => `${m.line ?? '-'} ${m.rule}`);
 
@@ -32,9 +32,18 @@ test('jinja loops, filters and sets', () => {
   assert.deepEqual(lintText(text, { vars: ['documents', 'name', 'is_admin', 'banned'] }), []);
 });
 
+test('jinja loops catch unfilled variables and raw blocks ignore literal endraw text', () => {
+  const loop = '{% for doc in documents %}{{ doc.title }} {{ missing }}{% endfor %}';
+  assert.deepEqual(rules(lintText(loop, { vars: ['documents'] })), ['1 unfilled-variable']);
+  const raw = '{% raw %}mention endraw and {{ ignored }}{% endraw %} {{ used }}';
+  assert.deepEqual(lintText(raw, { vars: ['used'] }), []);
+});
+
 test('mustache sections scope their inner names', () => {
   const text = '{{#items}}{{title}}{{/items}} {{! comment }} {{> partial}}';
   assert.deepEqual(lintText(text, { vars: ['items'] }), []);
+  const leaked = '{{#items}}{{title}}{{/items}}\nSummary: {{title}}';
+  assert.deepEqual(rules(lintText(leaked, { vars: ['items'] })), ['2 unfilled-variable']);
 });
 
 test('detects single-brace and dollar syntax', () => {
@@ -104,9 +113,11 @@ test('typeKeys reads interfaces and type literals', () => {
       fn: (a: string) => void;
     }
     type Other = { a: string, b: Array<{ c: number }> };
+    type WithLiterals$ = { url: 'https://example.com'; tag: '<foo>'; after: number };
   `;
   assert.deepEqual(typeKeys(src, 'Vars'), ['name', 'age', 'quoted-key', 'nested', 'fn']);
   assert.deepEqual(typeKeys(src, 'Other'), ['a', 'b']);
+  assert.deepEqual(typeKeys(src, 'WithLiterals$'), ['url', 'tag', 'after']);
   assert.throws(() => typeKeys(src, 'Missing'), /not found/);
 });
 
@@ -116,6 +127,7 @@ test('optionsFor merges matching globs in order', () => {
     rules: { 'unclosed-tag': 'warn' },
     files: {
       'prompts/**/*.md': { budget: 4000 },
+      'prompts/**/foo.md': { budget: 1000 },
       'prompts/support.md': { vars: ['a'], rules: { 'token-budget': 'error' } },
     },
   };
@@ -124,5 +136,31 @@ test('optionsFor merges matching globs in order', () => {
     rules: { 'unclosed-tag': 'warn', 'token-budget': 'error' },
   });
   assert.equal(optionsFor(config, 'prompts/deep/x.md').budget, 4000);
+  assert.equal(optionsFor(config, 'prompts/foo.md').budget, 1000);
+  assert.equal(optionsFor(config, 'prompts/deep/foo.md').budget, 1000);
+  assert.equal(optionsFor(config, 'prompts/xfoo.md').budget, 4000);
   assert.equal(optionsFor(config, 'other.md').budget, 8000);
+  assert.throws(() => optionsFor({ varsFrom: 'types.ts' }, 'a.md'), /invalid varsFrom/);
+  assert.throws(() => optionsFor({ varsFrom: 'types.ts#' }, 'a.md'), /invalid varsFrom/);
+  assert.throws(() => optionsFor({ varsFrom: '#Foo' }, 'a.md'), /invalid varsFrom/);
+});
+
+test('lintFiles merges rule overrides and collectFiles matches extensions case-insensitively', () => {
+  const files = collectFiles(['test/fixtures'], ['.MD']);
+  assert.equal(files.length, 1);
+  assert.match(files[0], /clean\.md$/);
+
+  const [result] = lintFiles(['test/fixtures/clean.md'], {
+    config: { budget: 1, rules: { 'token-budget': 'off' } },
+    overrides: { vars: [], rules: { 'unfilled-variable': 'warn' } },
+  });
+  assert.deepEqual(result.messages.map((m) => `${m.rule}:${m.severity}`), ['unfilled-variable:warn']);
+});
+
+test('github format escapes property characters in filenames', () => {
+  const out = format([{
+    file: 'dir/a,b:c%d.md',
+    messages: [{ rule: 'unclosed-tag', severity: 'error', line: 2, message: '<x> is never closed' }],
+  }], 'github');
+  assert.match(out, /^::error file=dir\/a%2Cb%3Ac%25d\.md,line=2,title=lint-prompts \(unclosed-tag\)::/);
 });

@@ -36,6 +36,10 @@ function parseArgs(argv) {
   const valueFlags = { '-c': 'config', '--config': 'config', '--vars': 'vars', '--budget': 'budget', '--syntax': 'syntax', '-f': 'format', '--format': 'format', '--max-warnings': 'maxWarnings' };
   for (let i = 0; i < argv.length; i++) {
     let arg = argv[i];
+    if (arg === '--') {
+      args.paths.push(...argv.slice(i + 1));
+      break;
+    }
     let value;
     if (arg.startsWith('--') && arg.includes('=')) [arg, value] = [arg.slice(0, arg.indexOf('=')), arg.slice(arg.indexOf('=') + 1)];
     if (arg === '-h' || arg === '--help') args.help = true;
@@ -53,7 +57,7 @@ function parseArgs(argv) {
 
 function toNumber(value, flag) {
   const n = Number(value);
-  if (!Number.isFinite(n)) throw new Error(`${flag} must be a number`);
+  if (value.trim() === '' || !Number.isFinite(n)) throw new Error(`${flag} must be a number`);
   return n;
 }
 
@@ -75,8 +79,16 @@ function main() {
   const config = configFile ? loadConfig(configFile) : {};
   const overrides = {};
   if (args.vars !== undefined) overrides.vars = args.vars.split(',').map((v) => v.trim()).filter(Boolean);
-  if (args.budget !== undefined) overrides.budget = toNumber(args.budget, '--budget');
-  if (args.syntax !== undefined) overrides.syntax = args.syntax;
+  if (args.budget !== undefined) {
+    overrides.budget = toNumber(args.budget, '--budget');
+    if (overrides.budget <= 0) throw new Error('--budget must be a positive number');
+  }
+  if (args.syntax !== undefined) {
+    if (!['auto', 'double', 'single', 'dollar'].includes(args.syntax)) {
+      throw new Error(`unknown syntax ${args.syntax}`);
+    }
+    overrides.syntax = args.syntax;
+  }
   const style = args.format ?? 'pretty';
   if (!['pretty', 'json', 'github'].includes(style)) throw new Error(`unknown format ${style}`);
 

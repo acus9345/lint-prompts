@@ -26,7 +26,7 @@ export interface LintOptions {
   vars?: string[];
   /** Token budget for the file. */
   budget?: number;
-  /** Template syntax. "auto" picks whichever appears most. */
+  /** Template syntax. "auto" prefers double, then dollar, then single outside code fences. */
   syntax?: Syntax;
   rules?: Partial<Record<RuleId, RuleSetting>>;
 }
@@ -80,5 +80,5 @@ export function scanVariables(
 export function findConfig(dir?: string): string | null;
 export function loadConfig(file: string): Config;
 export function optionsFor(config: Config, relPath: string): LintOptions;
-export function typeKeys(source: string, name: string): string[];
+export function typeKeys(source: string, name: string, label?: string): string[];
 export function format(results: FileResult[], style?: 'pretty' | 'json' | 'github'): string;

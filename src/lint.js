@@ -58,7 +58,8 @@ function checkVariables(text, syntax, vars, report) {
   const firstUse = new Map();
   const counts = new Map();
   for (const u of scan.uses) {
-    if (!firstUse.has(u.name)) firstUse.set(u.name, u);
+    const prev = firstUse.get(u.name);
+    if (!prev || (prev.scoped && !u.scoped)) firstUse.set(u.name, u);
     counts.set(u.name, (counts.get(u.name) ?? 0) + 1);
   }
 

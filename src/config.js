@@ -42,7 +42,12 @@ export function optionsFor(config, relPath) {
     };
   }
   if (options.varsFrom) {
-    const [file, type] = options.varsFrom.split('#');
+    const hash = options.varsFrom.indexOf('#');
+    const file = hash === -1 ? '' : options.varsFrom.slice(0, hash).trim();
+    const type = hash === -1 ? '' : options.varsFrom.slice(hash + 1).trim();
+    if (!file || !type) {
+      throw new Error(`invalid varsFrom "${options.varsFrom}": expected "path/to/file.ts#TypeName"`);
+    }
     const fromType = typeKeys(readFileSync(resolve(config.dir ?? '.', file), 'utf8'), type, options.varsFrom);
     options.vars = [...new Set([...(options.vars ?? []), ...fromType])];
   }
@@ -55,8 +60,13 @@ export function globToRegExp(glob) {
   for (let i = 0; i < glob.length; i++) {
     const c = glob[i];
     if (c === '*' && glob[i + 1] === '*') {
-      re += '.*';
-      i += glob[i + 2] === '/' ? 2 : 1;
+      if (glob[i + 2] === '/') {
+        re += '(?:.*/)?';
+        i += 2;
+      } else {
+        re += '.*';
+        i += 1;
+      }
     } else if (c === '*') re += '[^/]*';
     else if (c === '?') re += '[^/]';
     else re += c.replace(/[.+^${}()|[\]\\]/g, '\\$&');
@@ -66,14 +76,33 @@ export function globToRegExp(glob) {
 
 /** Top-level property names of `interface Name {}` or `type Name = {}` in TypeScript source. */
 export function typeKeys(source, name, label = name) {
-  const code = source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');
-  const head = new RegExp(`(?:interface\\s+${name}\\b[^{]*|type\\s+${name}\\b[^=]*=\\s*)\\{`).exec(code);
+  const code = source.replace(/"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'|\/\*[\s\S]*?\*\/|\/\/.*$/gm, (m) =>
+    m[0] === '/' ? ' ' : m,
+  );
+  const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const head = new RegExp(`(?:interface\\s+${escaped}(?![\\w$])[^{]*|type\\s+${escaped}(?![\\w$])[^=]*=\\s*)\\{`).exec(code);
   if (!head) throw new Error(`type ${label} not found`);
 
   let top = '';
   let depth = 1;
+  let quote = null;
   for (let i = head.index + head[0].length; i < code.length && depth > 0; i++) {
     const c = code[i];
+    if (quote) {
+      if (depth === 1) top += c;
+      if (c === '\\') {
+        i++;
+        if (depth === 1 && i < code.length) top += code[i];
+      } else if (c === quote) {
+        quote = null;
+      }
+      continue;
+    }
+    if (c === '"' || c === "'") {
+      quote = c;
+      if (depth === 1) top += c;
+      continue;
+    }
     if ('{([<'.includes(c)) depth++;
     else if ('})]>'.includes(c) && !(c === '>' && code[i - 1] === '=')) depth--;
     if (depth === 1) top += c;
